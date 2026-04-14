@@ -1,0 +1,20 @@
+.neo-repeat-generate-button {
+    min-width: 9.5em;
+}
+
+.neo-repeat-generate-button.neo-repeat-generate-active {
+    background: var(--button-primary-background-fill);
+    color: var(--button-primary-text-color);
+    border-color: var(--button-primary-border-color);
+}
+
+.neo-repeat-generate-button.neo-repeat-generate-busy {
+    filter: grayscale(1);
+}
+
+.neo-repeat-generate-status {
+    align-self: center;
+    font-size: 0.9em;
+    opacity: 0.85;
+    margin-left: 0.5em;
+}
