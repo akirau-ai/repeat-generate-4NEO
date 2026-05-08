@@ -39,6 +39,7 @@
             running: false,
             busy: false,
             button: null,
+            interruptButton: null,
             status: null,
             dependency: null,
             iteration: 0,
@@ -166,6 +167,11 @@
         state.button.textContent = state.running ? "Stop Queue Repeat" : "Start Queue Repeat";
         state.button.classList.toggle("neo-repeat-generate-active", state.running);
         state.button.classList.toggle("neo-repeat-generate-busy", state.busy);
+
+        if (state.interruptButton) {
+            state.interruptButton.disabled = false;
+            state.interruptButton.classList.toggle("neo-repeat-generate-interrupt-enabled", state.busy);
+        }
     }
 
     function getGenerateButton(tabName) {
@@ -432,6 +438,27 @@
         });
     }
 
+    function requestInterruptStop(tabName) {
+        const state = states[tabName];
+        state.running = false;
+        updateButton(tabName);
+        setStatus(tabName, state.busy ? "Interrupting..." : "Interrupt sent");
+        log(tabName, "repeat interrupt requested", {
+            busy: state.busy,
+            taskId: state.lastTaskId,
+        });
+
+        const interrupt = getInterruptButton(tabName);
+        if (!interrupt) {
+            setStatus(tabName, "Interrupt button not found");
+            log(tabName, "interrupt button missing");
+            return;
+        }
+
+        interrupt.click();
+        log(tabName, "interrupt click fired");
+    }
+
     function toggleRepeat(tabName) {
         const state = states[tabName];
         if (state.running) {
@@ -471,16 +498,26 @@
             toggleRepeat(tabName);
         });
 
+        const interruptButton = document.createElement("button");
+        interruptButton.type = "button";
+        interruptButton.className = "lg secondary gradio-button neo-repeat-generate-interrupt-button";
+        interruptButton.textContent = "Interrupt";
+        interruptButton.addEventListener("click", function () {
+            requestInterruptStop(tabName);
+        });
+
         const status = document.createElement("span");
         status.className = "neo-repeat-generate-status";
 
         state.button = button;
+        state.interruptButton = interruptButton;
         state.status = status;
 
         updateButton(tabName);
         setStatus(tabName, "Idle");
 
         toolRow.appendChild(button);
+        toolRow.appendChild(interruptButton);
         toolRow.appendChild(status);
 
         log(tabName, "ui mounted");

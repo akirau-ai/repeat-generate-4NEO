@@ -12,6 +12,22 @@
     filter: grayscale(1);
 }
 
+.neo-repeat-generate-interrupt-button {
+    min-width: 6.5em;
+    margin-left: 0.35em;
+    padding-left: 0.65em;
+    padding-right: 0.65em;
+    font-size: 0.9em;
+}
+
+.neo-repeat-generate-interrupt-button:disabled {
+    opacity: 0.55;
+}
+
+.neo-repeat-generate-interrupt-button.neo-repeat-generate-interrupt-enabled {
+    filter: none;
+}
+
 .neo-repeat-generate-status {
     align-self: center;
     font-size: 0.9em;
