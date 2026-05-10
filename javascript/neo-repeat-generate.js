@@ -38,6 +38,8 @@
         return {
             running: false,
             busy: false,
+            panel: null,
+            controlsRow: null,
             button: null,
             interruptButton: null,
             status: null,
@@ -164,7 +166,7 @@
             return;
         }
 
-        state.button.textContent = state.running ? "Stop Queue Repeat" : "Start Queue Repeat";
+        state.button.textContent = state.running ? "Stop" : "Endless";
         state.button.classList.toggle("neo-repeat-generate-active", state.running);
         state.button.classList.toggle("neo-repeat-generate-busy", state.busy);
 
@@ -491,6 +493,12 @@
             return;
         }
 
+        const panel = document.createElement("div");
+        panel.className = "neo-repeat-generate-panel";
+
+        const controlsRow = document.createElement("div");
+        controlsRow.className = "neo-repeat-generate-controls";
+
         const button = document.createElement("button");
         button.type = "button";
         button.className = "lg secondary gradio-button neo-repeat-generate-button";
@@ -509,6 +517,13 @@
         const status = document.createElement("span");
         status.className = "neo-repeat-generate-status";
 
+        controlsRow.appendChild(button);
+        controlsRow.appendChild(interruptButton);
+        panel.appendChild(controlsRow);
+        panel.appendChild(status);
+
+        state.panel = panel;
+        state.controlsRow = controlsRow;
         state.button = button;
         state.interruptButton = interruptButton;
         state.status = status;
@@ -516,9 +531,7 @@
         updateButton(tabName);
         setStatus(tabName, "Idle");
 
-        toolRow.appendChild(button);
-        toolRow.appendChild(interruptButton);
-        toolRow.appendChild(status);
+        toolRow.appendChild(panel);
 
         log(tabName, "ui mounted");
     }
