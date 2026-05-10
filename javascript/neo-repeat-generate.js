@@ -169,7 +169,7 @@
         state.button.classList.toggle("neo-repeat-generate-busy", state.busy);
 
         if (state.interruptButton) {
-            state.interruptButton.disabled = false;
+            state.interruptButton.disabled = !state.busy;
             state.interruptButton.classList.toggle("neo-repeat-generate-interrupt-enabled", state.busy);
         }
     }

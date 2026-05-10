@@ -22,6 +22,8 @@
 
 .neo-repeat-generate-interrupt-button:disabled {
     opacity: 0.55;
+    cursor: not-allowed;
+    filter: grayscale(1);
 }
 
 .neo-repeat-generate-interrupt-button.neo-repeat-generate-interrupt-enabled {
