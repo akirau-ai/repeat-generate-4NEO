@@ -47,6 +47,7 @@
             iteration: 0,
             lastTaskId: null,
             lastEventId: null,
+            pendingEventIds: [],
             capturedArgs: null,
             seeded: false,
         };
@@ -100,6 +101,7 @@
         state.dependency = {
             fnIndex: dependency.id,
             inputCount: dependency.inputs?.length || 0,
+            inputs: Array.isArray(dependency.inputs) ? dependency.inputs.slice() : [],
             triggerId: component.id,
         };
 
@@ -184,6 +186,59 @@
         return grRoot().getElementById(tabs[tabName].interruptElemId);
     }
 
+    function getSeedElemId(tabName) {
+        return `${tabName}_seed`;
+    }
+
+    function getNumericInputValue(elemId) {
+        const root = grRoot().getElementById(elemId);
+        if (!root) {
+            return null;
+        }
+
+        const input = root.querySelector("input, textarea");
+        if (!input) {
+            return null;
+        }
+
+        return String(input.value || "").trim();
+    }
+
+    function getSeedArgIndex(tabName) {
+        const dependency = getMainGenerateDependency(tabName);
+        const seedElemId = getSeedElemId(tabName);
+        const components = window.gradio_config?.components || [];
+
+        for (let i = 0; i < dependency.inputs.length; i += 1) {
+            const inputId = dependency.inputs[i];
+            const component = components.find(function (entry) {
+                return entry?.id === inputId;
+            });
+            if (component?.props?.elem_id === seedElemId) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    function resetCapturedSeedArgIfUsingRandomSeed(tabName, args) {
+        const currentSeedValue = getNumericInputValue(getSeedElemId(tabName));
+        if (!(currentSeedValue === "" || currentSeedValue === "-1")) {
+            return;
+        }
+
+        const seedArgIndex = getSeedArgIndex(tabName);
+        if (seedArgIndex === -1 || seedArgIndex >= args.length) {
+            return;
+        }
+
+        args[seedArgIndex] = -1;
+        log(tabName, "repeat seed reset to random", {
+            seedArgIndex,
+        });
+    }
+
     function runSubmitSideEffects(tabName, taskId) {
         const tab = tabs[tabName];
 
@@ -250,6 +305,35 @@
         return await response.json();
     }
 
+    async function cancelQueuedEvent(tabName, eventId) {
+        if (!eventId) {
+            return;
+        }
+
+        const dependency = getMainGenerateDependency(tabName);
+        const payload = {
+            session_hash: getSessionHash(),
+            fn_index: dependency.fnIndex,
+            event_id: eventId,
+        };
+
+        log(tabName, "queue cancel request", payload);
+
+        const response = await fetch("./cancel", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            throw new Error(await response.text());
+        }
+
+        return await response.json();
+    }
+
     async function startQueuedGeneration(tabName, reason) {
         const state = states[tabName];
         if (!state.running || state.busy) {
@@ -263,6 +347,7 @@
         const args = cloneArgs(state.capturedArgs);
         const taskId = createTaskId();
         args[0] = taskId;
+        resetCapturedSeedArgIfUsingRandomSeed(tabName, args);
 
         state.busy = true;
         state.lastTaskId = taskId;
@@ -281,6 +366,9 @@
         try {
             const result = await queueJoin(tabName, args);
             state.lastEventId = result.event_id || null;
+            if (state.lastEventId) {
+                state.pendingEventIds.push(state.lastEventId);
+            }
             state.iteration += 1;
             setStatus(tabName, `Queued ${state.iteration}`);
             log(tabName, "queue join accepted", {
@@ -364,6 +452,14 @@
         const state = states[tabName];
         taskToTab.delete(idTask);
         state.busy = false;
+        if (state.pendingEventIds.length > 0) {
+            state.pendingEventIds.shift();
+        }
+        if (state.pendingEventIds.length === 0) {
+            state.lastEventId = null;
+        } else {
+            state.lastEventId = state.pendingEventIds[state.pendingEventIds.length - 1];
+        }
         updateButton(tabName);
 
         log(tabName, "tracked task finished", {
@@ -440,7 +536,7 @@
         });
     }
 
-    function requestInterruptStop(tabName) {
+    async function requestInterruptStop(tabName) {
         const state = states[tabName];
         state.running = false;
         updateButton(tabName);
@@ -457,8 +553,24 @@
             return;
         }
 
+        const pendingEventIds = [...state.pendingEventIds];
+        state.pendingEventIds = [];
+        state.lastEventId = null;
+
         interrupt.click();
         log(tabName, "interrupt click fired");
+
+        for (const eventId of pendingEventIds) {
+            try {
+                await cancelQueuedEvent(tabName, eventId);
+                log(tabName, "queue cancel accepted", { eventId });
+            } catch (error) {
+                log(tabName, "queue cancel failed", {
+                    eventId,
+                    error: error.message,
+                });
+            }
+        }
     }
 
     function toggleRepeat(tabName) {
@@ -472,6 +584,7 @@
         state.busy = false;
         state.iteration = 0;
         state.lastEventId = null;
+        state.pendingEventIds = [];
         state.capturedArgs = null;
         state.seeded = false;
         updateButton(tabName);
